@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Detection Metrics</title>
+    <style>
+        .human { color: green; }
+        .bot { color: red; }
+        .offset { color: black; }
+        .time-valid { color: green; }
+        .time-invalid { color: red; }
+        .attribute { margin-bottom: 10px; }
+        .event { color: black; }
+    </style>
+</head>
+<body>
+
+    <h1>Bot Detection Metrics</h1>
+    <div id="metrics">
+        <div id="user-agent" class="attribute"><strong>User-Agent:</strong> Loading...</div>
+        <div id="notifications-disabled" class="attribute"><strong>Notifications Disabled:</strong> Loading...</div>
+        <div id="headless-ua" class="attribute"><strong>Headless UA:</strong> Loading...</div>
+        <div id="screen-offset" class="attribute"><strong>Screen Offset:</strong> Loading...</div>
+        <div id="window-width" class="attribute"><strong>Window Width:</strong> Loading...</div>
+        <div id="window-height" class="attribute"><strong>Window Height:</strong> Loading...</div>
+        <div id="window-avail-width" class="attribute"><strong>Window Available Width:</strong> Loading...</div>
+        <div id="window-avail-height" class="attribute"><strong>Window Available Height:</strong> Loading...</div>
+        <div id="window-avail-top" class="attribute"><strong>Window Available Top:</strong> Loading...</div>
+        <div id="window-avail-left" class="attribute"><strong>Window Available Left:</strong> Loading...</div>
+        <div id="window-color-depth" class="attribute"><strong>Window Color Depth:</strong> Loading...</div>
+        <div id="window-pixel-depth" class="attribute"><strong>Window Pixel Depth:</strong> Loading...</div>
+        <div id="public-ip" class="attribute"><strong>Public IP:</strong> Loading...</div>
+        <div id="time-validation" class="attribute"><strong>Time Validation (3s wait):</strong> Loading...</div>
+        <div id="click-event" class="attribute"><strong>Click Event:</strong> Not Detected</div>
+        <div id="keyboard-event" class="attribute"><strong>Keyboard Event:</strong> Not Detected</div>
+        <div id="scroll-event" class="attribute"><strong>Scroll Event:</strong> Not Detected</div>
+    </div>
+
+    <script>
+        let metrics = {};
+        let startTime = Date.now();
+
+        function updateMetric(attribute, value, isBot) {
+            let colorClass = isBot ? 'bot' : 'human';
+            if (attribute === 'screen-offset' || attribute.includes('event')) {
+                colorClass = 'offset';
+            } else if (attribute === 'time-validation') {
+                colorClass = (Date.now() - startTime >= 3000) ? 'time-valid' : 'time-invalid';
+            }
+            let metricElement = document.getElementById(attribute);
+            if (metricElement) {
+                metricElement.innerHTML = `<strong>${attribute.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> <span class="${colorClass}">${value}</span>`;
+            }
+        }
+
+        function collectMetrics() {
+            metrics.notificationsDisabled = Notification.permission === 'denied';
+            updateMetric('notifications-disabled', metrics.notificationsDisabled, metrics.notificationsDisabled);
+
+            metrics.headlessUA = /HeadlessChrome/.test(window.navigator.userAgent);
+            updateMetric('headless-ua', metrics.headlessUA, metrics.headlessUA);
+
+            metrics.screenOffset = window.screenX + window.screenY;
+            updateMetric('screen-offset', metrics.screenOffset, false);
+
+            metrics.windowWidth = window.screen.width;
+            updateMetric('window-width', metrics.windowWidth, false);
+
+            metrics.windowHeight = window.screen.height;
+            updateMetric('window-height', metrics.windowHeight, false);
+
+            metrics.windowAvailWidth = window.screen.availWidth;
+            updateMetric('window-avail-width', metrics.windowAvailWidth, false);
+
+            metrics.windowAvailHeight = window.screen.availHeight;
+            updateMetric('window-avail-height', metrics.windowAvailHeight, false);
+
+            metrics.windowAvailTop = window.screen.availTop ?? "Not Supported";
+            updateMetric('window-avail-top', metrics.windowAvailTop, false);
+
+            metrics.windowAvailLeft = window.screen.availLeft ?? "Not Supported";
+            updateMetric('window-avail-left', metrics.windowAvailLeft, false);
+
+            metrics.windowColorDepth = window.screen.colorDepth;
+            updateMetric('window-color-depth', metrics.windowColorDepth, false);
+
+            metrics.windowPixelDepth = window.screen.pixelDepth;
+            updateMetric('window-pixel-depth', metrics.windowPixelDepth, false);
+
+            metrics.userAgent = window.navigator.userAgent;
+            updateMetric('user-agent', metrics.userAgent, false);
+
+            fetch('https://icanhazip.com/')
+                .then(response => response.text())
+                .then(ip => {
+                    metrics.publicIP = ip.trim();
+                    updateMetric('public-ip', metrics.publicIP, false);
+                })
+                .catch(() => {
+                    metrics.publicIP = "Error fetching IP";
+                    updateMetric('public-ip', metrics.publicIP, true);
+                });
+        }
+
+        // Event listeners for user interactions
+        window.addEventListener('click', () => {
+            metrics.clickEvent = true;
+            updateMetric('click-event', 'Detected', false);
+        });
+
+        window.addEventListener('keydown', () => {
+            metrics.keyboardEvent = true;
+            updateMetric('keyboard-event', 'Detected', false);
+        });
+
+        window.addEventListener('scroll', () => {
+            metrics.scrollEvent = true;
+            updateMetric('scroll-event', 'Detected', false);
+        });
+
+        // Collect initial metrics
+        collectMetrics();
+
+        setTimeout(() => {
+            metrics.timeValidation = (Date.now() - startTime) + "ms";
+            updateMetric('time-validation', metrics.timeValidation, false);
+
+            // Send the collected metrics as Base64-encoded JSON
+            let metricsJSON = JSON.stringify(metrics);
+            let encodedMetrics = btoa(metricsJSON);
+
+            // Send the metrics via an image request (GET request)
+            let img = new Image();
+            img.src = `botcheck.html?metric=${encodeURIComponent(encodedMetrics)}`;
+            console.log('Metrics sent:', img.src);
+
+        }, 3000);
+    </script>
+
+</body>
+</html>
